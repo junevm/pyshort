@@ -134,7 +134,7 @@ Django routes to redirect_url() in views.py
 Look up 'aB3dEfG' in database:
   - First check custom_alias column
   - Then check short_code column
-         |
+         | 
          v
 Checks:
   - Is the link active? (is_active = True)
