@@ -17,3 +17,4 @@ media/
 *.egg-info/
 dist/
 build/
+STUDY_GUIDE.md

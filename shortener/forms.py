@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from shortener.models import ShortenedURL
-from shortener.validators import validate_url, validate_custom_alias
 
 
 class RegisterForm(UserCreationForm):
@@ -37,23 +36,17 @@ class ShortenURLForm(forms.ModelForm):
             }),
         }
 
-    def clean_original_url(self):
-        url = self.cleaned_data.get('original_url', '')
-        validate_url(url)
-        return url
-
     def clean_custom_alias(self):
         alias = self.cleaned_data.get('custom_alias', '')
         if not alias:
             return alias
-        validate_custom_alias(alias)
+        if len(alias) < 3 or len(alias) > 50:
+            raise ValidationError("Alias must be between 3 and 50 characters.")
         qs = ShortenedURL.objects.filter(custom_alias=alias)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            raise ValidationError("This custom alias is already taken. Please choose another.")
-        if ShortenedURL.objects.filter(short_code=alias).exists():
-            raise ValidationError("This alias conflicts with an existing short code.")
+            raise ValidationError("This custom alias is already taken.")
         return alias
 
     def clean_expires_at(self):

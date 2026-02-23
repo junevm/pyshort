@@ -4,9 +4,9 @@ from django.utils import timezone
 
 
 class ShortenedURL(models.Model):
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='shortened_urls')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     original_url = models.URLField(max_length=2048)
-    short_code = models.CharField(max_length=20, unique=True, db_index=True)
+    short_code = models.CharField(max_length=20, unique=True)
     custom_alias = models.CharField(max_length=50, blank=True, null=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
@@ -22,9 +22,7 @@ class ShortenedURL(models.Model):
 
     @property
     def is_expired(self):
-        if self.expires_at and timezone.now() > self.expires_at:
-            return True
-        return False
+        return bool(self.expires_at and timezone.now() > self.expires_at)
 
     def increment_click(self):
         self.click_count += 1

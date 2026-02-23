@@ -7,8 +7,7 @@
         <div class="card">
             <div class="card-body">
                 <h5>Link Details</h5>
-                <p><strong>Original URL:</strong> <a href="{{ link.original_url }}" target="_blank">{{ link.original_url
-                        }}</a></p>
+                <p><strong>Original URL:</strong> <a href="{{ link.original_url }}" target="_blank">{{ link.original_url }}</a></p>
                 <p><strong>Short Code:</strong> {{ link.short_code }}</p>
                 {% if link.custom_alias %}<p><strong>Custom Alias:</strong> {{ link.custom_alias }}</p>{% endif %}
                 <p><strong>Created:</strong> {{ link.created_at }}</p>

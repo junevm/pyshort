@@ -75,7 +75,6 @@ py-shorterner/
     ├── models.py              # Database tables (ShortenedURL, ClickEvent)
     ├── views.py               # Web page handlers (home, dashboard, redirect, etc.)
     ├── forms.py               # HTML form classes (for URL input, registration)
-    ├── validators.py          # Input validation (URL format, alias format)
     ├── utils.py               # Helper functions (generate short code, get IP)
     ├── admin.py               # Configure Django admin panel
     ├── urls.py                # All URL patterns for the app
@@ -253,7 +252,7 @@ Two validation functions:
 
 **`RegisterForm`** - Extends Django's `UserCreationForm` to add a required email field.
 
-**`ShortenURLForm`** - A ModelForm based on `ShortenedURL`. Has Bootstrap-styled widgets. Custom `clean_` methods call our validators and also check for duplicate aliases.
+**`ShortenURLForm`** - A ModelForm based on `ShortenedURL`. Has Bootstrap-styled widgets. `clean_custom_alias` checks the alias length (3-50 chars) and that it is not already taken. `clean_expires_at` rejects dates in the past. URL format validation is handled automatically by Django's `URLField`.
 
 ---
 
