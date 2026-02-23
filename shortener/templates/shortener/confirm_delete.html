@@ -1,0 +1,20 @@
+{% extends "shortener/base.html" %}
+{% block title %}Delete Link{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h1 class="card-title">Delete Link</h1>
+                <p>Are you sure you want to delete the short link <strong>{{ link.effective_code }}</strong>?</p>
+                <p class="text-muted">Original URL: {{ link.original_url|truncatechars:80 }}</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                    <a href="/dashboard/" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

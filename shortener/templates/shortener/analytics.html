@@ -1,0 +1,50 @@
+{% extends "shortener/base.html" %}
+{% block title %}Analytics - {{ link.effective_code }}{% endblock %}
+{% block content %}
+<h1>Analytics: {{ link.effective_code }}</h1>
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5>Link Details</h5>
+                <p><strong>Original URL:</strong> <a href="{{ link.original_url }}" target="_blank">{{ link.original_url }}</a></p>
+                <p><strong>Short Code:</strong> {{ link.short_code }}</p>
+                {% if link.custom_alias %}<p><strong>Custom Alias:</strong> {{ link.custom_alias }}</p>{% endif %}
+                <p><strong>Created:</strong> {{ link.created_at }}</p>
+                <p><strong>Expires:</strong> {{ link.expires_at|default:"Never" }}</p>
+                <p><strong>Status:</strong> {% if link.is_active %}Active{% else %}Inactive{% endif %}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>Total Clicks</h5>
+                <h1 class="display-4">{{ link.click_count }}</h1>
+            </div>
+        </div>
+    </div>
+</div>
+<h3>Recent Clicks</h3>
+{% if click_events %}
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead>
+            <tr><th>Time</th><th>IP Address</th><th>Referrer</th></tr>
+        </thead>
+        <tbody>
+            {% for event in click_events %}
+            <tr>
+                <td>{{ event.clicked_at }}</td>
+                <td>{{ event.ip_address|default:"-" }}</td>
+                <td>{{ event.referrer|truncatechars:60|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No clicks yet.</p>
+{% endif %}
+<a href="/dashboard/" class="btn btn-secondary mt-3">Back to Dashboard</a>
+{% endblock %}

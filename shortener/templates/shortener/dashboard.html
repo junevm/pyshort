@@ -1,0 +1,44 @@
+{% extends "shortener/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>My Links</h1>
+    <a href="/create/" class="btn btn-primary">Create New Link</a>
+</div>
+{% if links %}
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Short Code</th>
+                <th>Original URL</th>
+                <th>Clicks</th>
+                <th>Created</th>
+                <th>Expires</th>
+                <th>Active</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for link in links %}
+            <tr>
+                <td><a href="/{{ link.effective_code }}/">{{ link.effective_code }}</a></td>
+                <td><a href="{{ link.original_url }}" target="_blank">{{ link.original_url|truncatechars:50 }}</a></td>
+                <td>{{ link.click_count }}</td>
+                <td>{{ link.created_at|date:"Y-m-d" }}</td>
+                <td>{{ link.expires_at|date:"Y-m-d"|default:"-" }}</td>
+                <td>{% if link.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+                <td>
+                    <a href="/analytics/{{ link.pk }}/" class="btn btn-sm btn-info">Stats</a>
+                    <a href="/edit/{{ link.pk }}/" class="btn btn-sm btn-warning">Edit</a>
+                    <a href="/delete/{{ link.pk }}/" class="btn btn-sm btn-danger">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No links yet. <a href="/create/">Create your first link!</a></p>
+{% endif %}
+{% endblock %}
