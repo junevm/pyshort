@@ -1,19 +1,6 @@
-import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-
-
-class BlacklistedDomain(models.Model):
-    domain = models.CharField(max_length=255, unique=True)
-    added_at = models.DateTimeField(auto_now_add=True)
-    reason = models.TextField(blank=True)
-
-    def __str__(self):
-        return self.domain
-
-    class Meta:
-        ordering = ['domain']
 
 
 class ShortenedURL(models.Model):
@@ -59,22 +46,3 @@ class ClickEvent(models.Model):
 
     class Meta:
         ordering = ['-clicked_at']
-
-
-class APIKey(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='api_keys')
-    key = models.CharField(max_length=64, unique=True)
-    name = models.CharField(max_length=100)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
-
-    def __str__(self):
-        return f"{self.name} ({self.user.username})"
-
-    def save(self, *args, **kwargs):
-        if not self.key:
-            self.key = uuid.uuid4().hex + uuid.uuid4().hex
-        super().save(*args, **kwargs)
-
-    class Meta:
-        ordering = ['-created_at']

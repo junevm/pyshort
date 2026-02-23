@@ -27,7 +27,8 @@
                 <td>{{ link.click_count }}</td>
                 <td>{{ link.created_at|date:"Y-m-d" }}</td>
                 <td>{{ link.expires_at|date:"Y-m-d"|default:"-" }}</td>
-                <td>{% if link.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+                <td>{% if link.is_active %}<span class="badge bg-success">Active</span>{% else %}<span
+                        class="badge bg-secondary">Inactive</span>{% endif %}</td>
                 <td>
                     <a href="/analytics/{{ link.pk }}/" class="btn btn-sm btn-info">Stats</a>
                     <a href="/edit/{{ link.pk }}/" class="btn btn-sm btn-warning">Edit</a>

@@ -25,32 +25,31 @@ This is a **URL Shortener** - similar to bit.ly or tinyurl.com.
 
 **Features:**
 
-| Feature | What it does |
-|---|---|
-| URL Shortening | Takes a long URL, generates a 7-character short code using `nanoid` |
-| Custom Aliases | User can set their own alias like `/my-project` instead of a random code |
-| Expiry Dates | Links can be set to expire after a certain date/time |
-| Click Analytics | Every time someone clicks the link, it records IP, browser, referrer |
-| User Accounts | Login/register so users can manage their own links |
-| Dashboard | Logged-in users see all their links with click counts |
-| REST API | Developers can use the app programmatically via API with token auth |
-| Domain Blacklist | Admin can block specific domains from being shortened |
-| Django Admin | Full admin panel at `/admin/` to manage everything |
+| Feature         | What it does                                                             |
+| --------------- | ------------------------------------------------------------------------ |
+| URL Shortening  | Takes a long URL, generates a 7-character short code using `nanoid`      |
+| Custom Aliases  | User can set their own alias like `/my-project` instead of a random code |
+| Expiry Dates    | Links can be set to expire after a certain date/time                     |
+| Click Analytics | Every time someone clicks the link, it records IP, browser, referrer     |
+| User Accounts   | Login/register so users can manage their own links                       |
+| Dashboard       | Logged-in users see all their links with click counts                    |
+| Django Admin    | Full admin panel at `/admin/` to manage everything                       |
 
 ---
 
 ## 2. Tech Stack
 
-| Library | Why we used it |
-|---|---|
-| **Django** | Main Python web framework - handles routing, templates, forms, ORM |
-| **djangorestframework** | Adds REST API support to Django - used for the `/api/` endpoints |
-| **nanoid** | Generates short unique IDs - used to create the 7-char short codes |
-| **whitenoise** | Serves static files (CSS, JS) directly from Django without a separate server |
-| **gunicorn** | Production WSGI server to run the Django app |
-| **psycopg2-binary** | PostgreSQL driver (used in production with Docker) |
+| Library             | Why we used it                                                               |
+| ------------------- | ---------------------------------------------------------------------------- |
+| **Django**          | Main Python web framework - handles routing, templates, forms, ORM           |
+| **nanoid**          | Generates short unique IDs - used to create the 7-char short codes           |
+| **django-ipware**   | Gets the real IP address of visitors, even behind proxies                    |
+| **whitenoise**      | Serves static files (CSS, JS) directly from Django without a separate server |
+| **gunicorn**        | Production WSGI server to run the Django app                                 |
+| **psycopg2-binary** | PostgreSQL driver (used in production with Docker)                           |
 
 **Why nanoid specifically?**
+
 - It generates URL-safe random strings
 - Very low chance of collision (same ID generated twice)
 - Simple one-line usage: `generate(size=7)`
@@ -73,15 +72,13 @@ py-shorterner/
 │   └── wsgi.py                # Entry point for web server
 │
 └── shortener/                 # Main app with all our logic
-    ├── models.py              # Database tables (ShortenedURL, ClickEvent, etc.)
+    ├── models.py              # Database tables (ShortenedURL, ClickEvent)
     ├── views.py               # Web page handlers (home, dashboard, redirect, etc.)
-    ├── api_views.py           # REST API handlers
-    ├── serializers.py         # Convert model data to/from JSON for the API
     ├── forms.py               # HTML form classes (for URL input, registration)
-    ├── validators.py          # Input validation (URL check, blacklist check, alias check)
+    ├── validators.py          # Input validation (URL format, alias format)
     ├── utils.py               # Helper functions (generate short code, get IP)
     ├── admin.py               # Configure Django admin panel
-    ├── urls.py                # All URL patterns for the app (web + API)
+    ├── urls.py                # All URL patterns for the app
     ├── migrations/            # Database migration files (auto-generated)
     └── templates/             # HTML files live INSIDE the app folder
         ├── shortener/         # Namespace folder (same name as app)
@@ -111,7 +108,6 @@ home() view in views.py handles POST request
          v
 ShortenURLForm validates the input:
   - Is the URL valid? (must start with http:// or https://)
-  - Is the domain blacklisted?
   - Is the custom alias already taken?
          |
          v
@@ -176,35 +172,15 @@ User automatically logged in
 Redirected to /dashboard/
 ```
 
-### 4.4 API Flow (for developers)
-
-```
-Developer sends POST /api/links/ with JSON body
-  + Authorization: Token <their-token>
-         |
-         v
-TokenAuthentication verifies the token
-         |
-         v
-ShortenedURLViewSet.create() is called
-         |
-         v
-ShortenedURLSerializer validates the data
-         |
-         v
-Short code generated, saved to database
-         |
-         v
-JSON response returned with short_url
-```
-
 ---
 
 ## 5. File-by-File Explanation
 
 ### `shortener/utils.py`
+
 ```python
 from nanoid import generate
+from ipware import get_client_ip as ipware_get_client_ip
 
 def generate_unique_short_code():
     from shortener.models import ShortenedURL
@@ -212,32 +188,32 @@ def generate_unique_short_code():
         code = generate(size=7)  # generates something like "aB3dEfG"
         if not ShortenedURL.objects.filter(short_code=code).exists():
             return code  # only return if it doesn't already exist in DB
+
+def get_client_ip(request):
+    ip, _ = ipware_get_client_ip(request)
+    return ip or ''
 ```
-This is the heart of the shortener. `nanoid` generates a random 7-character string using letters and numbers. We check the database to make sure no other URL already has that code (collision prevention). The `while True` loop keeps trying until it finds a unique one - in practice this almost never loops more than once.
+
+`nanoid` generates the short code. `django-ipware` handles getting the visitor's IP - it automatically checks `X-Forwarded-For` and other headers so it works correctly even behind proxies and load balancers. Much cleaner than doing it manually.
 
 ---
 
 ### `shortener/models.py`
 
-Four database tables:
+Two database tables:
 
 **ShortenedURL** - the main table
+
 - Stores the original URL, short code, custom alias, expiry date, click count
 - `effective_code` property: returns custom_alias if set, otherwise short_code
 - `is_expired` property: checks if current time is past expires_at
 - `increment_click()`: adds 1 to click_count and saves
 
 **ClickEvent** - analytics table
+
 - Every click gets one row here
 - Stores IP address, browser, referrer
 - Linked to ShortenedURL with a ForeignKey
-
-**APIKey** - for API authentication
-- Each user can have multiple API keys
-- Key is auto-generated in the `save()` method using two UUIDs joined together
-
-**BlacklistedDomain** - security table
-- Admin adds domains here to block them from being shortened
 
 ---
 
@@ -265,11 +241,9 @@ All the web page logic:
 
 ### `shortener/validators.py`
 
-Three validation functions:
+Two validation functions:
 
 **`validate_url(url)`** - Uses Django's built-in `URLValidator` to check if URL is valid. Only http:// and https:// are allowed.
-
-**`validate_not_blacklisted(url)`** - Extracts the domain from the URL and checks if it (or a parent domain) is in BlacklistedDomain table.
 
 **`validate_custom_alias(alias)`** - Checks: 3-50 characters, only letters/numbers/hyphens allowed.
 
@@ -283,38 +257,12 @@ Three validation functions:
 
 ---
 
-### `shortener/serializers.py`
-
-Used only by the REST API. Converts Python objects to JSON and validates API input.
-
-**`ShortenedURLSerializer`** - Adds a `short_url` computed field that builds the full URL. Validates URL and alias in the same way as the form validators.
-
-**`ClickEventSerializer`** - Read-only. Returns click analytics as JSON.
-
-**`APIKeySerializer`** - Manages API keys. The `key` field is read-only (auto-generated by the model).
-
----
-
-### `shortener/api_views.py`
-
-Two ViewSets using Django REST Framework:
-
-**`ShortenedURLViewSet`** - Full CRUD for links. Also has two extra actions:
-- `clicks` (GET) - returns click history
-- `toggle_active` (POST) - flips is_active between True/False
-
-**`APIKeyViewSet`** - Full CRUD for API keys.
-
-Both use `TokenAuthentication` and filter results to only the logged-in user's data.
-
----
-
 ### `urlshortener/settings.py`
 
 All Django configuration in one file:
-- `INSTALLED_APPS` - lists all Django apps including our `shortener` app and `rest_framework`
-- `DATABASES` - using SQLite (simple file-based database, no server needed)
-- `REST_FRAMEWORK` - API settings including rate limiting (100 requests/hour for anonymous, 1000 for logged-in users)
+
+- `INSTALLED_APPS` - lists all Django apps including our `shortener` app
+- `DATABASES` - uses SQLite locally, switches to PostgreSQL when `POSTGRES_HOST` env var is set (Docker)
 - `LOGIN_REDIRECT_URL = '/dashboard/'` - where to go after login
 - `STATICFILES_STORAGE` - whitenoise handles static files
 
@@ -349,7 +297,6 @@ All URL patterns for the whole project in one place:
 /accounts/login/    -> Django's built-in LoginView
 /accounts/logout/   -> Django's built-in LogoutView
 /accounts/register/ -> our register view
-/api/               -> REST API routes (DRF router)
 /<short_code>/      -> redirect_url view (must be last!)
 ```
 
@@ -364,28 +311,24 @@ The short_code route is last because `<str:short_code>` would match anything - i
 ```
       User (Django built-in)
        |
-       |-- ShortenedURL (user can be null for anonymous)
-       |     |
-       |     `-- ClickEvent (one URL has many click events)
-       |
-       `-- APIKey (one user has many API keys)
-
-   BlacklistedDomain (standalone, no foreign key)
+       `-- ShortenedURL (user can be null for anonymous)
+             |
+             `-- ClickEvent (one URL has many click events)
 ```
 
 ### ShortenedURL columns
 
-| Column | Type | Description |
-|---|---|---|
-| id | Integer | Auto-increment primary key |
-| user | ForeignKey | Which user created it (nullable) |
-| original_url | URLField | The long URL |
-| short_code | CharField | The generated nanoid code (unique) |
-| custom_alias | CharField | Optional user-defined alias (unique) |
-| created_at | DateTimeField | When it was created |
-| expires_at | DateTimeField | Optional expiry time |
-| click_count | PositiveInteger | How many times it was clicked |
-| is_active | Boolean | Can be toggled off to disable the link |
+| Column       | Type            | Description                            |
+| ------------ | --------------- | -------------------------------------- |
+| id           | Integer         | Auto-increment primary key             |
+| user         | ForeignKey      | Which user created it (nullable)       |
+| original_url | URLField        | The long URL                           |
+| short_code   | CharField       | The generated nanoid code (unique)     |
+| custom_alias | CharField       | Optional user-defined alias (unique)   |
+| created_at   | DateTimeField   | When it was created                    |
+| expires_at   | DateTimeField   | Optional expiry time                   |
+| click_count  | PositiveInteger | How many times it was clicked          |
+| is_active    | Boolean         | Can be toggled off to disable the link |
 
 ---
 
@@ -397,9 +340,10 @@ The short_code route is last because `<str:short_code>` would match anything - i
 
 ### Step 1 - Start the Project
 
-Tell the teacher: *"This is a URL Shortener built with Django and Python. Let me show you how to run it first."*
+Tell the teacher: _"This is a URL Shortener built with Django and Python. Let me show you how to run it first."_
 
 Open terminal and run:
+
 ```bash
 pip install -r requirements.txt
 python manage.py migrate
@@ -414,7 +358,7 @@ Open browser at `http://localhost:8000/`
 
 Open file: **`shortener/templates/shortener/home.html`**
 
-Say: *"This is the home page. Any user, even without logging in, can shorten a URL. The form is handled by the `ShortenURLForm` class."*
+Say: _"This is the home page. Any user, even without logging in, can shorten a URL. The form is handled by the `ShortenURLForm` class."_
 
 **Demo:** Type `https://www.google.com/search?q=python+django+tutorial` and click Shorten.
 
@@ -426,7 +370,7 @@ Show the short URL that appears. Copy it.
 
 Open file: **`shortener/views.py`** - scroll to `redirect_url` function
 
-Say: *"When someone visits the short link, Django routes it to the `redirect_url` function. It looks up the code in the database, records the click event, and does an HTTP redirect to the original URL."*
+Say: _"When someone visits the short link, Django routes it to the `redirect_url` function. It looks up the code in the database, records the click event, and does an HTTP redirect to the original URL."_
 
 **Demo:** Paste the short URL in the browser and show that it redirects to Google.
 
@@ -436,7 +380,7 @@ Say: *"When someone visits the short link, Django routes it to the `redirect_url
 
 Open file: **`shortener/utils.py`**
 
-Say: *"To generate the short code, I used a library called `nanoid`. It generates a 7-character random string using letters and numbers. I then check the database to make sure no other URL has the same code - this prevents collisions."*
+Say: _"To generate the short code, I used a library called `nanoid`. It generates a 7-character random string using letters and numbers. I then check the database to make sure no other URL has the same code - this prevents collisions."_
 
 ---
 
@@ -444,11 +388,11 @@ Say: *"To generate the short code, I used a library called `nanoid`. It generate
 
 Open file: **`shortener/models.py`**
 
-Say: *"Here is the main database model - `ShortenedURL`. Each row in this table represents one shortened URL. It stores the original URL, the short code, an optional custom alias, click count, and expiry date."*
+Say: _"Here is the main database model - `ShortenedURL`. Each row in this table represents one shortened URL. It stores the original URL, the short code, an optional custom alias, click count, and expiry date."_
 
-Point to `increment_click()`: *"Each time someone clicks the link, this method adds 1 to the click count and saves it."*
+Point to `increment_click()`: _"Each time someone clicks the link, this method adds 1 to the click count and saves it."_
 
-Point to `is_expired` property: *"This property checks if the current time is past the expiry date."*
+Point to `is_expired` property: _"This property checks if the current time is past the expiry date."_
 
 ---
 
@@ -456,7 +400,7 @@ Point to `is_expired` property: *"This property checks if the current time is pa
 
 Open file: **`shortener/forms.py`** - show `RegisterForm`
 
-Say: *"For user registration, I extended Django's built-in `UserCreationForm` and added an email field. Django handles all the password hashing and security automatically."*
+Say: _"For user registration, I extended Django's built-in `UserCreationForm` and added an email field. Django handles all the password hashing and security automatically."_
 
 **Demo:** Go to `http://localhost:8000/accounts/register/` and register a new account.
 
@@ -466,11 +410,11 @@ Say: *"For user registration, I extended Django's built-in `UserCreationForm` an
 
 Open file: **`shortener/views.py`** - scroll to `dashboard` function
 
-Say: *"After login, the user is taken to the dashboard. The `@login_required` decorator makes sure only logged-in users can access it. It fetches only that user's links from the database."*
+Say: _"After login, the user is taken to the dashboard. The `@login_required` decorator makes sure only logged-in users can access it. It fetches only that user's links from the database."_
 
 Open file: **`shortener/templates/shortener/dashboard.html`**
 
-Say: *"The template loops over each link and shows the short code, original URL, click count, and action buttons."*
+Say: _"The template loops over each link and shows the short code, original URL, click count, and action buttons."_
 
 **Demo:** Create a new link from the dashboard, edit it, view analytics.
 
@@ -480,11 +424,11 @@ Say: *"The template loops over each link and shows the short code, original URL,
 
 Open file: **`shortener/templates/shortener/analytics.html`**
 
-Say: *"For each link, the user can see analytics - how many times it was clicked, when, from what IP address, what browser, and from which website."*
+Say: _"For each link, the user can see analytics - how many times it was clicked, when, from what IP address, what browser, and from which website."_
 
 Open file: **`shortener/models.py`** - show `ClickEvent` class
 
-Say: *"The `ClickEvent` model stores one record for each click. It is linked to `ShortenedURL` through a ForeignKey relationship."*
+Say: _"The `ClickEvent` model stores one record for each click. It is linked to `ShortenedURL` through a ForeignKey relationship."_
 
 ---
 
@@ -493,35 +437,24 @@ Say: *"The `ClickEvent` model stores one record for each click. It is linked to 
 Go to `http://localhost:8000/admin/`
 
 First create a superuser if not done:
+
 ```bash
 python manage.py createsuperuser
 ```
 
-Say: *"Django provides a built-in admin panel. I registered all our models there. The admin can view all URLs, all click events, manage API keys, and block domains."*
+Say: _"Django provides a built-in admin panel. I registered all our models there. The admin can view all URLs and all click events."_
 
 Open file: **`shortener/admin.py`**
 
-Say: *"These few lines of code are enough to get a full admin interface for each model."*
+Say: _"These few lines of code are enough to get a full admin interface for each model."_
 
 ---
 
-### Step 10 - Show REST API (if asked)
-
-Open file: **`shortener/api_views.py`**
-
-Say: *"I also built a REST API using Django REST Framework. Developers can create short URLs, list their links, get click analytics, and toggle links on/off - all through API calls."*
-
-Open file: **`shortener/serializers.py`**
-
-Say: *"Serializers convert our database objects to JSON and validate incoming API data."*
-
----
-
-### Step 11 - Show Project Settings
+### Step 10 - Show Project Settings
 
 Open file: **`urlshortener/settings.py`**
 
-Say: *"All Django settings are in one file. I am using SQLite as the database which is a simple file-based database - no separate database server needed for development. For production with Docker, we can switch to PostgreSQL."*
+Say: _"All Django settings are in one file. I am using SQLite as the database which is a simple file-based database - no separate database server needed for development. For production with Docker, we can switch to PostgreSQL."_
 
 ---
 
@@ -553,6 +486,7 @@ A: ORM stands for Object-Relational Mapper. It lets us work with the database us
 
 **Q: What is the MVT pattern in Django?**
 A: MVT stands for Model-View-Template.
+
 - **Model** - defines the database structure (our `models.py`)
 - **View** - contains the business logic, handles requests and responses (our `views.py`)
 - **Template** - the HTML files that render the user interface (our `templates/` folder)
@@ -608,40 +542,16 @@ A: The `ShortenedURL` model has an `expires_at` DateTimeField that is optional (
 
 **Q: How is click tracking implemented?**
 A: When a redirect happens, two things occur:
+
 1. `obj.increment_click()` is called, which adds 1 to `click_count` and saves the model.
 2. A `ClickEvent` object is created with the visitor's IP address (from `get_client_ip()`), their browser's user-agent, and the referrer URL.
 
 **Q: How do you get the visitor's IP address?**
-A: In `utils.py`, `get_client_ip(request)` first checks the `HTTP_X_FORWARDED_FOR` header. This header is set when traffic passes through a proxy or load balancer - common in production. If that header is not present, it falls back to `REMOTE_ADDR`, which is the direct IP of the request.
-
-**Q: How does domain blacklisting work?**
-A: The `BlacklistedDomain` model stores blocked domains. When a URL is submitted, `validate_not_blacklisted()` extracts the domain from the URL using `urlparse`. It then checks if that domain (or any parent domain) exists in the `BlacklistedDomain` table. If it does, a `ValidationError` is raised and the form is rejected.
-
----
-
-### REST API Questions
-
-**Q: What is a REST API?**
-A: REST (Representational State Transfer) API is a way for applications to communicate over HTTP using standard methods - GET (read), POST (create), PUT/PATCH (update), DELETE (delete). Our API lets developers interact with the URL shortener programmatically without using the web interface.
-
-**Q: What is Django REST Framework (DRF)?**
-A: Django REST Framework is a library that makes building REST APIs with Django much easier. It provides ViewSets (which give you full CRUD in one class), Serializers (which convert models to JSON), authentication classes, and permission classes. Instead of writing separate views for list, create, retrieve, update, delete - we just extend `ModelViewSet`.
-
-**Q: What is token authentication?**
-A: Token authentication is how the API verifies who is making a request. The user gets a secret token string and includes it in every API request as a header: `Authorization: Token abc123...`. The server looks up the token in the database to find the associated user. This is more suitable for API use than session cookies.
-
-**Q: What is a serializer?**
-A: A serializer in Django REST Framework converts Python objects (database model instances) into JSON format and vice versa. When sending data from the API, the serializer turns the model into a JSON response. When receiving data (POST/PUT), the serializer validates the incoming JSON and creates/updates the model.
-
-**Q: What is rate limiting?**
-A: Rate limiting restricts how many requests a user can make in a given time period. I configured the API to allow 100 requests per hour for anonymous users and 1000 requests per hour for logged-in users. This prevents abuse of the API.
+A: In `utils.py`, I use the `django-ipware` library. It provides a `get_client_ip(request)` function that handles all the complexity - it checks `X-Forwarded-For`, `X-Real-IP`, and other headers automatically. This works correctly even when the app is behind a proxy or load balancer, without needing to write that logic manually.
 
 ---
 
 ### Architecture and Design Questions
-
-**Q: Why did you separate the API views from the web views?**
-A: The web views (`views.py`) return HTML pages for browsers. The API views (`api_views.py`) return JSON for programmatic access. They do similar things but in different ways - for example, the web views use forms and templates, while the API views use serializers. Keeping them separate makes the code cleaner and easier to maintain.
 
 **Q: Why is the `/<short_code>/` route last in urls.py?**
 A: Because `<str:short_code>` matches any string. If it was placed first, it would intercept every other URL - `/dashboard/` would be caught as a short code "dashboard", `/admin/` would be caught as "admin", etc. By placing it last, all the specific routes are matched first, and only unmatched paths fall through to the short code lookup.
@@ -650,7 +560,7 @@ A: Because `<str:short_code>` matches any string. If it was placed first, it wou
 A: WhiteNoise is a library that allows Django to serve static files (CSS, JavaScript, images) directly. Normally in production you would use a separate web server like Nginx to serve static files. WhiteNoise simplifies deployment by letting Django handle this itself, while still being efficient.
 
 **Q: How does user isolation work - how do you make sure a user can only see their own links?**
-A: In the dashboard and other views, the database query always includes `filter(user=request.user)`. So even if you know the primary key of another user's link, the `get_object_or_404(ShortenedURL, pk=pk, user=request.user)` query will fail (return 404) because both conditions must match. The same principle applies in the API - `get_queryset()` always returns only the current user's data.
+A: In the dashboard and other views, the database query always includes `filter(user=request.user)`. So even if you know the primary key of another user's link, the `get_object_or_404(ShortenedURL, pk=pk, user=request.user)` query will fail (return 404) because both conditions must match - right primary key AND belonging to the logged-in user.
 
 **Q: What happens if someone tries to access a short URL that doesn't exist?**
 A: In `redirect_url`, if we cannot find the short code in either `custom_alias` or `short_code` columns, we call `raise Http404("Short URL not found.")`. Django catches this and returns a 404 page to the user.
@@ -689,4 +599,4 @@ A: This sets the default ordering for database queries. The `-` prefix means des
 
 ---
 
-*Good luck with your demonstration! You have built a complete, working web application with authentication, database storage, analytics, and a REST API. Be confident - this is solid work.*
+_Good luck with your demonstration! You have built a complete, working web application with user authentication, database storage, URL shortening with nanoid, and click analytics. Be confident - this is solid work._

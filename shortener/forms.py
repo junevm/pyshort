@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from shortener.models import ShortenedURL
-from shortener.validators import validate_url, validate_not_blacklisted, validate_custom_alias
+from shortener.validators import validate_url, validate_custom_alias
 
 
 class RegisterForm(UserCreationForm):
@@ -40,7 +40,6 @@ class ShortenURLForm(forms.ModelForm):
     def clean_original_url(self):
         url = self.cleaned_data.get('original_url', '')
         validate_url(url)
-        validate_not_blacklisted(url)
         return url
 
     def clean_custom_alias(self):

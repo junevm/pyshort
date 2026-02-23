@@ -13,10 +13,10 @@
                         <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
                         {{ field }}
                         {% if field.errors %}
-                            <div class="text-danger">{{ field.errors }}</div>
+                        <div class="text-danger">{{ field.errors }}</div>
                         {% endif %}
                         {% if field.help_text %}
-                            <div class="form-text">{{ field.help_text }}</div>
+                        <div class="form-text">{{ field.help_text }}</div>
                         {% endif %}
                     </div>
                     {% endfor %}
