@@ -1,44 +1,243 @@
 {% extends "shortener/base.html" %}
-{% block title %}URL Shortener - Home{% endblock %}
+{% block title %}Shorten any link{% endblock %}
+
+{% block extra_head %}
+<style>
+    .hero {
+        position: relative; overflow: hidden;
+        background: var(--md-sys-color-primary-container);
+        color: var(--md-sys-color-on-primary-container);
+        border-radius: var(--md-sys-shape-corner-xl);
+        padding: 40px 24px;
+        margin-bottom: 32px;
+    }
+    @media (min-width: 905px) { .hero { padding: 56px 48px; } }
+    .hero::after {
+        /* Decorative tonal blob; never an interactive element. */
+        content: ""; position: absolute; right: -120px; top: -80px;
+        width: 360px; height: 360px; border-radius: 50%;
+        background: radial-gradient(closest-side, var(--md-sys-color-tertiary-container), transparent 75%);
+        opacity: .65; pointer-events: none;
+    }
+    .hero h1 { font: var(--md-sys-typescale-display-small); letter-spacing: -.25px; max-width: 18ch; }
+    @media (min-width: 905px) { .hero h1 { font: var(--md-sys-typescale-display-medium); } }
+    .hero p.lede { font: var(--md-sys-typescale-body-large); letter-spacing: 0.5px; max-width: 56ch; margin: 12px 0 24px; color: var(--md-sys-color-on-primary-container); opacity: .92; }
+    .hero .chip { background: rgba(255,255,255,.55); border-color: transparent; color: var(--md-sys-color-on-primary-container); }
+    @media (prefers-color-scheme: dark) { .hero .chip { background: rgba(255,255,255,.10); } }
+
+    .result {
+        margin-top: 24px;
+        display: flex; align-items: center; gap: 12px;
+        padding: 8px 8px 8px 16px;
+        background: var(--md-sys-color-tertiary-container);
+        color: var(--md-sys-color-on-tertiary-container);
+        border-radius: var(--md-sys-shape-corner-md);
+    }
+    .result .url {
+        flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-family: "Roboto Mono", monospace; font-weight: 500;
+        color: var(--md-sys-color-on-tertiary-container);
+    }
+
+    .feature-grid { display: grid; gap: 24px; grid-template-columns: 1fr; }
+    @media (min-width: 905px) { .feature-grid { grid-template-columns: 1.5fr 1fr; } }
+
+    .feature {
+        display: flex; gap: 16px; align-items: flex-start;
+        padding: 16px 0;
+    }
+    .feature + .feature { border-top: 1px solid var(--md-sys-color-outline-variant); }
+    .feature-icon {
+        flex: none; width: 40px; height: 40px;
+        border-radius: var(--md-sys-shape-corner-md);
+        background: var(--md-sys-color-primary-container);
+        color: var(--md-sys-color-on-primary-container);
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .feature h3 { font: var(--md-sys-typescale-title-medium); }
+    .feature p { font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface-variant); margin: 4px 0 0; }
+
+    details.advanced > summary {
+        cursor: pointer; list-style: none; user-select: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        color: var(--md-sys-color-primary);
+        font: var(--md-sys-typescale-label-large);
+        padding: 8px 0;
+    }
+    details.advanced > summary::-webkit-details-marker { display: none; }
+    details.advanced > summary .icon { transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard); }
+    details.advanced[open] > summary .icon { transform: rotate(180deg); }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <h1 class="mb-4">Shorten Your URL</h1>
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="{{ form.original_url.id_for_label }}" class="form-label">Long URL</label>
-                        {{ form.original_url }}
-                        {% if form.original_url.errors %}
-                        <div class="text-danger">{{ form.original_url.errors }}</div>
-                        {% endif %}
+<section class="hero">
+    <span class="chip" style="margin-bottom:16px;">
+        <span class="icon" aria-hidden="true">verified</span>
+        Free · No tracking · Open source
+    </span>
+    <h1>Short links you can trust.</h1>
+    <p class="lede">
+        Turn long, ugly URLs into crisp, shareable handles. Add a password, an expiry,
+        a click cap, or a custom alias. Every redirect is scheme-checked twice and
+        rate-limited at the edge.
+    </p>
+    <div class="row wrap gap-8">
+        <span class="chip"><span class="icon" aria-hidden="true">shield</span> Safe redirects</span>
+        <span class="chip"><span class="icon" aria-hidden="true">lock</span> Password gate</span>
+        <span class="chip"><span class="icon" aria-hidden="true">timer</span> Expiry &amp; click cap</span>
+        <span class="chip"><span class="icon" aria-hidden="true">qr_code_2</span> QR codes</span>
+    </div>
+</section>
+
+<div class="feature-grid">
+
+    <!-- Shorten form (elevated card, M3 filled text fields) ------------- -->
+    <div class="card card-elevated">
+        <h2 class="headline-small">Shorten a URL</h2>
+        <p class="body-medium muted mt-8 mb-24">Paste any <code>http://</code> or <code>https://</code> link below.</p>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="field {% if form.original_url.errors %}has-error{% endif %}">
+                <input id="{{ form.original_url.id_for_label }}" name="{{ form.original_url.name }}"
+                       type="url" inputmode="url" autocomplete="url" required
+                       placeholder=" " value="{{ form.original_url.value|default:'' }}">
+                <label for="{{ form.original_url.id_for_label }}">Long URL</label>
+            </div>
+            {% if form.original_url.errors %}
+                <div class="field-support error">{{ form.original_url.errors|striptags }}</div>
+            {% endif %}
+
+            <div class="field-row cols-2">
+                <div>
+                    <div class="field {% if form.custom_alias.errors %}has-error{% endif %}">
+                        <input id="{{ form.custom_alias.id_for_label }}" name="{{ form.custom_alias.name }}"
+                               type="text" placeholder=" " value="{{ form.custom_alias.value|default:'' }}"
+                               pattern="[A-Za-z0-9_-]{3,50}" autocomplete="off" spellcheck="false">
+                        <label for="{{ form.custom_alias.id_for_label }}">Custom alias (optional)</label>
                     </div>
-                    <div class="mb-3">
-                        <label for="{{ form.custom_alias.id_for_label }}" class="form-label">Custom Alias
-                            (optional)</label>
-                        {{ form.custom_alias }}
-                        {% if form.custom_alias.errors %}
-                        <div class="text-danger">{{ form.custom_alias.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label for="{{ form.expires_at.id_for_label }}" class="form-label">Expires At (optional)</label>
-                        {{ form.expires_at }}
-                        {% if form.expires_at.errors %}
-                        <div class="text-danger">{{ form.expires_at.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <button type="submit" class="btn btn-primary">Shorten URL</button>
-                </form>
-                {% if short_url %}
-                <div class="mt-4 alert alert-success">
-                    <strong>Short URL:</strong> <a href="{{ short_url }}">{{ short_url }}</a>
+                    {% if form.custom_alias.errors %}
+                        <div class="field-support error">{{ form.custom_alias.errors|striptags }}</div>
+                    {% else %}
+                        <div class="field-support">3–50 chars · letters, digits, <code>-</code>, <code>_</code></div>
+                    {% endif %}
                 </div>
-                {% endif %}
+                <div>
+                    <div class="field {% if form.expires_at.errors %}has-error{% endif %}">
+                        <input id="{{ form.expires_at.id_for_label }}" name="{{ form.expires_at.name }}"
+                               type="datetime-local" placeholder=" " value="{{ form.expires_at.value|default:'' }}">
+                        <label for="{{ form.expires_at.id_for_label }}">Expires at (optional)</label>
+                    </div>
+                    {% if form.expires_at.errors %}
+                        <div class="field-support error">{{ form.expires_at.errors|striptags }}</div>
+                    {% else %}
+                        <div class="field-support">Auto-deactivates after this date</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <details class="advanced mt-8">
+                <summary>
+                    Advanced options
+                    <span class="icon" aria-hidden="true">expand_more</span>
+                </summary>
+                <div class="mt-16">
+                    <div class="field {% if form.description.errors %}has-error{% endif %}">
+                        <input id="{{ form.description.id_for_label }}" name="{{ form.description.name }}"
+                               type="text" placeholder=" " value="{{ form.description.value|default:'' }}"
+                               maxlength="200">
+                        <label for="{{ form.description.id_for_label }}">Internal note</label>
+                    </div>
+                    <div class="field-support">Private label. Search uses this on the dashboard.</div>
+
+                    <div class="field-row cols-2 mt-16">
+                        <div>
+                            <div class="field {% if form.password.errors %}has-error{% endif %}">
+                                <input id="{{ form.password.id_for_label }}" name="{{ form.password.name }}"
+                                       type="password" placeholder=" " autocomplete="new-password" maxlength="72">
+                                <label for="{{ form.password.id_for_label }}">Password gate</label>
+                            </div>
+                            {% if form.password.errors %}
+                                <div class="field-support error">{{ form.password.errors|striptags }}</div>
+                            {% else %}
+                                <div class="field-support">PBKDF2-hashed · leave blank to disable</div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="field {% if form.max_clicks.errors %}has-error{% endif %}">
+                                <input id="{{ form.max_clicks.id_for_label }}" name="{{ form.max_clicks.name }}"
+                                       type="number" placeholder=" " min="0" max="1000000"
+                                       value="{{ form.max_clicks.value|default:'' }}">
+                                <label for="{{ form.max_clicks.id_for_label }}">Click cap</label>
+                            </div>
+                            {% if form.max_clicks.errors %}
+                                <div class="field-support error">{{ form.max_clicks.errors|striptags }}</div>
+                            {% else %}
+                                <div class="field-support"><code>0</code> = unlimited</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <div class="mt-24">
+                <button type="submit" class="btn btn-filled with-leading">
+                    <span class="icon">bolt</span> Shorten URL
+                </button>
+            </div>
+        </form>
+
+        {% if short_url %}
+        <div class="result">
+            <span class="icon" aria-hidden="true">check_circle</span>
+            <a class="url" id="short-url-out" href="{{ short_url }}" target="_blank" rel="noopener">{{ short_url }}</a>
+            <button type="button" class="icon-btn" data-copy="#short-url-out" aria-label="Copy short URL" title="Copy">
+                <span class="icon">content_copy</span>
+            </button>
+            <a class="icon-btn" href="{{ short_url }}" target="_blank" rel="noopener" aria-label="Open in new tab" title="Open">
+                <span class="icon">open_in_new</span>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Why PyShort? (filled card with feature list) ----------------------- -->
+    <aside class="card card-filled">
+        <h2 class="title-large">Why PyShort?</h2>
+        <div class="mt-16">
+            <div class="feature">
+                <span class="feature-icon"><span class="icon">verified_user</span></span>
+                <div>
+                    <h3>Hardened by default</h3>
+                    <p>Two-layer scheme allow-list, reserved-alias guard, PBKDF2 password hashing.</p>
+                </div>
+            </div>
+            <div class="feature">
+                <span class="feature-icon" style="background:var(--md-sys-color-tertiary-container); color:var(--md-sys-color-on-tertiary-container);"><span class="icon">bolt</span></span>
+                <div>
+                    <h3>Built for speed</h3>
+                    <p>Atomic click counting, indexed lookups, in-process rate limiter.</p>
+                </div>
+            </div>
+            <div class="feature">
+                <span class="feature-icon" style="background:var(--md-sys-color-secondary-container); color:var(--md-sys-color-on-secondary-container);"><span class="icon">analytics</span></span>
+                <div>
+                    <h3>Own your data</h3>
+                    <p>Self-hosted. Click analytics stay on your server, never a third party.</p>
+                </div>
             </div>
         </div>
-    </div>
+        {% if not user.is_authenticated %}
+        <hr class="divider mt-24">
+        <a href="{% url 'register' %}" class="btn btn-outlined with-trailing" style="width:100%;">
+            Create a free account
+            <span class="icon">arrow_forward</span>
+        </a>
+        <p class="body-small muted mt-8 mb-0">Anonymous links work too. An account unlocks the dashboard, analytics, and QR codes.</p>
+        {% endif %}
+    </aside>
+
 </div>
 {% endblock %}

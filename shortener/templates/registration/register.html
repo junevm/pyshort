@@ -1,27 +1,84 @@
 {% extends "shortener/base.html" %}
-{% block title %}Register{% endblock %}
+{% block title %}Create your account{% endblock %}
+
+{% block extra_head %}
+<style>
+    .auth-form input[type=text],
+    .auth-form input[type=email],
+    .auth-form input[type=password] {
+        display: block; width: 100%; height: 56px;
+        padding: 24px 16px 8px; margin: 0;
+        background: var(--md-sys-color-surface-container-highest);
+        color: var(--md-sys-color-on-surface);
+        border: 0; border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
+        border-radius: var(--md-sys-shape-corner-xs) var(--md-sys-shape-corner-xs) 0 0;
+        font: var(--md-sys-typescale-body-large);
+        outline: 0;
+        transition: border-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+    }
+    .auth-form input:hover { border-bottom-color: var(--md-sys-color-on-surface); }
+    .auth-form input:focus { border-bottom: 2px solid var(--md-sys-color-primary); padding-bottom: 7px; }
+    .auth-form .field { position: relative; margin-bottom: 4px; }
+    .auth-form .field > label {
+        position: absolute; left: 16px; top: 18px; pointer-events: none;
+        color: var(--md-sys-color-on-surface-variant);
+        font: var(--md-sys-typescale-body-large);
+        transform-origin: left center;
+        transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+                    color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+    }
+    .auth-form .field input:focus + label,
+    .auth-form .field input:not(:placeholder-shown) + label {
+        transform: translateY(-14px) scale(0.75);
+        color: var(--md-sys-color-primary);
+    }
+    /* Password validator hints render as a <ul>. Style as M3 supporting text. */
+    .auth-form .field-support ul { margin: 4px 0 0; padding-left: 18px; }
+    .auth-form .field-support li { margin-bottom: 2px; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <h1>Register</h1>
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {% for field in form %}
-                    <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}
-                        <div class="text-danger">{{ field.errors }}</div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                    <button type="submit" class="btn btn-primary">Register</button>
-                </form>
-                <p class="mt-3">Already have an account? <a href="/accounts/login/">Login</a></p>
-            </div>
+<div style="max-width: 480px; margin: 32px auto 0;">
+    <div class="card card-elevated">
+        <div class="center mb-24">
+            <span class="empty-mark"><span class="icon" style="font-size:30px;">person_add</span></span>
+            <h1 class="headline-small">Create your account</h1>
+            <p class="body-medium muted mt-8">Free, no credit card. Unlocks the dashboard, analytics, and QR codes.</p>
         </div>
+
+        <form method="post" class="auth-form" novalidate>
+            {% csrf_token %}
+
+            {% for field in form %}
+            <div class="field {% if not forloop.first %}mt-16{% endif %}">
+                {# Inject the placeholder=' ' attribute and float label, regardless of widget type. #}
+                <input
+                    id="{{ field.id_for_label }}"
+                    name="{{ field.name }}"
+                    type="{% if field.name == 'email' %}email{% elif 'password' in field.name %}password{% else %}text{% endif %}"
+                    {% if field.field.required %}required{% endif %}
+                    autocomplete="{% if 'password' in field.name %}new-password{% elif field.name == 'username' %}username{% elif field.name == 'email' %}email{% endif %}"
+                    placeholder=" "
+                    value="{{ field.value|default:'' }}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            </div>
+            {% if field.errors %}
+                <div class="field-support error">{{ field.errors|striptags }}</div>
+            {% elif field.help_text %}
+                <div class="field-support">{{ field.help_text|safe }}</div>
+            {% endif %}
+            {% endfor %}
+
+            <button type="submit" class="btn btn-filled with-trailing mt-24" style="width:100%;">
+                Create account
+                <span class="icon">arrow_forward</span>
+            </button>
+        </form>
+
+        <p class="center body-medium muted mt-24 mb-0">
+            Already have one? <a href="{% url 'login' %}">Sign in</a>
+        </p>
     </div>
 </div>
 {% endblock %}

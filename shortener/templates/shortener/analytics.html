@@ -1,54 +1,175 @@
 {% extends "shortener/base.html" %}
-{% block title %}Analytics - {{ link.effective_code }}{% endblock %}
+{% block title %}Analytics · {{ link.effective_code }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); }
+    @media (min-width: 905px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+
+    .stat {
+        background: var(--md-sys-color-surface-container-low);
+        border-radius: var(--md-sys-shape-corner-md);
+        padding: 20px;
+    }
+    .stat .label { font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-on-surface-variant); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat .value { font: var(--md-sys-typescale-headline-medium); font-variant-numeric: tabular-nums; margin-top: 4px; }
+    .stat .value.small { font: var(--md-sys-typescale-title-large); }
+    .stat .sub   { font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); margin-top: 4px; }
+
+    .share-bar {
+        display: flex; align-items: center; gap: 12px;
+        padding: 8px 8px 8px 16px; margin-bottom: 24px;
+        background: var(--md-sys-color-primary-container);
+        color: var(--md-sys-color-on-primary-container);
+        border-radius: var(--md-sys-shape-corner-md);
+    }
+    .share-bar .url {
+        flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-family: "Roboto Mono", monospace; font-weight: 600;
+        color: var(--md-sys-color-on-primary-container);
+    }
+    .share-bar .icon-btn { color: var(--md-sys-color-on-primary-container); }
+
+    .two-col { display: grid; gap: 24px; grid-template-columns: 1fr; }
+    @media (min-width: 905px) { .two-col { grid-template-columns: 2fr 1fr; } }
+
+    .qr-card { text-align: center; }
+    .qr-card img {
+        max-width: 220px; width: 100%;
+        background: #fff;
+        padding: 12px;
+        border-radius: var(--md-sys-shape-corner-md);
+        border: 1px solid var(--md-sys-color-outline-variant);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<h1>Analytics: {{ link.effective_code }}</h1>
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <h5>Link Details</h5>
-                <p><strong>Original URL:</strong> <a href="{{ link.original_url }}" target="_blank">{{ link.original_url }}</a></p>
-                <p><strong>Short Code:</strong> {{ link.short_code }}</p>
-                {% if link.custom_alias %}<p><strong>Custom Alias:</strong> {{ link.custom_alias }}</p>{% endif %}
-                <p><strong>Created:</strong> {{ link.created_at }}</p>
-                <p><strong>Expires:</strong> {{ link.expires_at|default:"Never" }}</p>
-                <p><strong>Status:</strong> {% if link.is_active %}Active{% else %}Inactive{% endif %}</p>
-            </div>
+<a href="{% url 'dashboard' %}" class="btn btn-text" style="padding-left:0; margin-bottom:8px;">
+    <span class="icon">arrow_back</span> Back to dashboard
+</a>
+
+<div class="row wrap gap-16 mb-24" style="justify-content: space-between; align-items:flex-start;">
+    <div class="grow">
+        <div class="row wrap gap-12 mb-8">
+            <h1 class="headline-medium mono">{{ link.effective_code }}</h1>
+            {% if link.is_active %}
+                <span class="chip success"><span class="icon" aria-hidden="true">check_circle</span> Active</span>
+            {% else %}
+                <span class="chip"><span class="icon" aria-hidden="true">block</span> Inactive</span>
+            {% endif %}
+            {% if link.has_password %}<span class="chip tonal"><span class="icon" aria-hidden="true">lock</span> Password</span>{% endif %}
+            {% if link.is_expired %}<span class="chip error"><span class="icon" aria-hidden="true">schedule</span> Expired</span>{% endif %}
         </div>
+        <a href="{{ link.original_url }}" target="_blank" rel="noopener" class="body-medium muted">
+            {{ link.original_url|truncatechars:80 }}
+            <span class="icon" style="font-size:14px; vertical-align:-2px;" aria-hidden="true">open_in_new</span>
+        </a>
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body text-center">
-                <h5>Total Clicks</h5>
-                <h1 class="display-4">{{ link.click_count }}</h1>
-            </div>
-        </div>
+    <div class="row gap-8">
+        <a href="{% url 'edit_link' link.pk %}" class="btn btn-outlined with-leading">
+            <span class="icon">edit</span> Edit
+        </a>
+        <a href="{% url 'delete_link' link.pk %}" class="btn btn-error with-leading">
+            <span class="icon">delete</span> Delete
+        </a>
     </div>
 </div>
-<h3>Recent Clicks</h3>
-{% if click_events %}
-<div class="table-responsive">
-    <table class="table table-sm">
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>IP Address</th>
-                <th>Referrer</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for event in click_events %}
-            <tr>
-                <td>{{ event.clicked_at }}</td>
-                <td>{{ event.ip_address|default:"-" }}</td>
-                <td>{{ event.referrer|truncatechars:60|default:"-" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+
+<div class="share-bar">
+    <span class="icon" aria-hidden="true">link</span>
+    <a class="url" id="share-url" href="{{ share_url }}" target="_blank" rel="noopener">{{ share_url }}</a>
+    <button type="button" class="icon-btn" data-copy="#share-url" aria-label="Copy short URL" title="Copy">
+        <span class="icon">content_copy</span>
+    </button>
+    <a class="icon-btn" href="{{ share_url }}" target="_blank" rel="noopener" aria-label="Open" title="Open">
+        <span class="icon">open_in_new</span>
+    </a>
 </div>
-{% else %}
-<p class="text-muted">No clicks yet.</p>
-{% endif %}
-<a href="/dashboard/" class="btn btn-secondary mt-3">Back to Dashboard</a>
+
+<!-- Stat cards ---------------------------------------------------------- -->
+<div class="stats-grid mb-24">
+    <div class="stat">
+        <div class="label">Total clicks</div>
+        <div class="value">{{ link.click_count }}</div>
+        <div class="sub">{% if link.max_clicks %}of {{ link.max_clicks }} max{% else %}no cap{% endif %}</div>
+    </div>
+    <div class="stat">
+        <div class="label">Created</div>
+        <div class="value small">{{ link.created_at|date:"M j, Y" }}</div>
+        <div class="sub">{{ link.created_at|time:"H:i" }} UTC</div>
+    </div>
+    <div class="stat">
+        <div class="label">Expires</div>
+        <div class="value small">{{ link.expires_at|date:"M j, Y"|default:"Never" }}</div>
+        <div class="sub">{% if link.expires_at %}{{ link.expires_at|time:"H:i" }} UTC{% else %}no expiry{% endif %}</div>
+    </div>
+    <div class="stat">
+        <div class="label">Short code</div>
+        <div class="value small mono">{{ link.short_code }}</div>
+        <div class="sub">{% if link.custom_alias %}alias: <code>{{ link.custom_alias }}</code>{% else %}no alias{% endif %}</div>
+    </div>
+</div>
+
+<div class="two-col">
+    <!-- Recent clicks -------------------------------------------------- -->
+    <section>
+        <div class="card-outlined" style="padding:0; overflow:hidden; border-radius: var(--md-sys-shape-corner-md);">
+            <header class="row" style="justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--md-sys-color-outline-variant);">
+                <h2 class="title-large" style="font:var(--md-sys-typescale-title-medium);">Recent clicks</h2>
+                <span class="body-small muted">Last {{ click_events|length }} of {{ link.click_count }}</span>
+            </header>
+            {% if click_events %}
+            <div style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">When</th>
+                            <th scope="col">IP address</th>
+                            <th scope="col">Referrer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in click_events %}
+                        <tr>
+                            <td><span title="{{ event.clicked_at }}">{{ event.clicked_at|date:"M j, H:i" }}</span></td>
+                            <td class="mono">{{ event.ip_address|default:"—" }}</td>
+                            <td class="muted truncate">{{ event.referrer|truncatechars:60|default:"—" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty" style="background:transparent; padding:48px 24px;">
+                <span class="empty-mark"><span class="icon" style="font-size:30px;">analytics</span></span>
+                <h3>No clicks yet</h3>
+                <p>Share the short URL above and the first clicks will appear here.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if link.description %}
+        <div class="card card-filled mt-16" style="padding:16px 20px;">
+            <div class="label-medium muted" style="text-transform:uppercase;">Note</div>
+            <div class="body-medium mt-8">{{ link.description }}</div>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- QR sidebar ----------------------------------------------------- -->
+    <aside>
+        <div class="card card-outlined qr-card">
+            <div class="row gap-8 mb-16" style="justify-content:center;">
+                <span class="icon" style="color:var(--md-sys-color-primary);">qr_code_2</span>
+                <h2 class="title-medium" style="margin:0;">QR code</h2>
+            </div>
+            <img src="{% url 'qr_code' link.pk %}" alt="QR for {{ link.effective_code }}">
+            <p class="body-small muted mt-16 mb-16">Scan to open the short URL on any phone.</p>
+            <a href="{% url 'qr_code' link.pk %}" class="btn btn-tonal with-leading" download="{{ link.effective_code }}.png" style="width:100%;">
+                <span class="icon">download</span> Download PNG
+            </a>
+        </div>
+    </aside>
+</div>
 {% endblock %}

@@ -17,3 +17,5 @@ media/
 *.egg-info/
 dist/
 build/
+.venv/
+.playwright-mcp/

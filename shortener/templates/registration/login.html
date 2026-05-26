@@ -1,27 +1,88 @@
 {% extends "shortener/base.html" %}
-{% block title %}Login{% endblock %}
+{% block title %}Sign in{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Adopt Django's built-in auth widgets into M3 floating-label fields
+       without needing widget changes in forms.py. */
+    .auth-form input[type=text],
+    .auth-form input[type=email],
+    .auth-form input[type=password] {
+        display: block; width: 100%; height: 56px;
+        padding: 24px 16px 8px; margin: 0;
+        background: var(--md-sys-color-surface-container-highest);
+        color: var(--md-sys-color-on-surface);
+        border: 0; border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
+        border-radius: var(--md-sys-shape-corner-xs) var(--md-sys-shape-corner-xs) 0 0;
+        font: var(--md-sys-typescale-body-large);
+        outline: 0;
+        transition: border-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+    }
+    .auth-form input:hover  { border-bottom-color: var(--md-sys-color-on-surface); }
+    .auth-form input:focus  { border-bottom: 2px solid var(--md-sys-color-primary); padding-bottom: 7px; }
+    .auth-form .field { position: relative; margin-bottom: 4px; }
+    .auth-form .field > label {
+        position: absolute; left: 16px; top: 18px; pointer-events: none;
+        color: var(--md-sys-color-on-surface-variant);
+        font: var(--md-sys-typescale-body-large);
+        transform-origin: left center;
+        transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+                    color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+    }
+    .auth-form .field input:focus + label,
+    .auth-form .field input:not(:placeholder-shown) + label {
+        transform: translateY(-14px) scale(0.75);
+        color: var(--md-sys-color-primary);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-4">
-        <h1>Login</h1>
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {% for field in form %}
-                    <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}
-                        <div class="text-danger">{{ field.errors }}</div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                    <button type="submit" class="btn btn-primary">Login</button>
-                </form>
-                <p class="mt-3">Don't have an account? <a href="/accounts/register/">Register</a></p>
-            </div>
+<div style="max-width: 440px; margin: 32px auto 0;">
+    <div class="card card-elevated">
+        <div class="center mb-24">
+            <span class="empty-mark"><span class="icon" style="font-size:30px;">login</span></span>
+            <h1 class="headline-small">Welcome back</h1>
+            <p class="body-medium muted mt-8">Sign in to manage your links.</p>
         </div>
+
+        <form method="post" class="auth-form" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="card-filled mb-16" style="background:var(--md-sys-color-error-container); color:var(--md-sys-color-on-error-container); padding:12px 16px; border-radius: var(--md-sys-shape-corner-sm);">
+                <span class="row gap-8">
+                    <span class="icon" aria-hidden="true">error</span>
+                    <span class="body-medium">{{ form.non_field_errors|striptags }}</span>
+                </span>
+            </div>
+            {% endif %}
+
+            {# Manual render to keep the floating-label markup. Django auth form has 'username' and 'password'. #}
+            <div class="field">
+                <input id="{{ form.username.id_for_label }}" name="{{ form.username.name }}"
+                       type="text" autocomplete="username" required placeholder=" "
+                       value="{{ form.username.value|default:'' }}">
+                <label for="{{ form.username.id_for_label }}">Username</label>
+            </div>
+            {% if form.username.errors %}<div class="field-support error">{{ form.username.errors|striptags }}</div>{% endif %}
+
+            <div class="field mt-16">
+                <input id="{{ form.password.id_for_label }}" name="{{ form.password.name }}"
+                       type="password" autocomplete="current-password" required placeholder=" ">
+                <label for="{{ form.password.id_for_label }}">Password</label>
+            </div>
+            {% if form.password.errors %}<div class="field-support error">{{ form.password.errors|striptags }}</div>{% endif %}
+
+            <button type="submit" class="btn btn-filled with-trailing mt-24" style="width:100%;">
+                Sign in
+                <span class="icon">arrow_forward</span>
+            </button>
+        </form>
+
+        <p class="center body-medium muted mt-24 mb-0">
+            New here? <a href="{% url 'register' %}">Create an account</a>
+        </p>
     </div>
 </div>
 {% endblock %}

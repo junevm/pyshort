@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:15
+    image: docker.io/library/postgres:15
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
@@ -12,11 +12,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    network_mode: host
+    ports:
+      - "5432:5432"
 
   web:
     build: .
     command: >
-      sh -c "python manage.py migrate --settings=urlshortener.settings &&
+      sh -c "for i in {1..30}; do
+             pg_isready -h localhost -U urlshortener >/dev/null 2>&1 && break;
+             echo 'Waiting for db...';
+             sleep 1;
+             done &&
+             python manage.py migrate --settings=urlshortener.settings &&
              gunicorn urlshortener.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - .:/app
@@ -29,11 +37,11 @@ services:
       - POSTGRES_DB=urlshortener
       - POSTGRES_USER=urlshortener
       - POSTGRES_PASSWORD=urlshortener
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=localhost
       - POSTGRES_PORT=5432
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+    network_mode: host
 
 volumes:
   postgres_data:

@@ -1,30 +1,107 @@
 {% extends "shortener/base.html" %}
-{% block title %}{{ action }} Link{% endblock %}
+{% block title %}{{ action }} link{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <h1>{{ action }} Link</h1>
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {% for field in form %}
-                    <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}
-                        <div class="text-danger">{{ field.errors }}</div>
-                        {% endif %}
-                        {% if field.help_text %}
-                        <div class="form-text">{{ field.help_text }}</div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                    <button type="submit" class="btn btn-primary">{{ action }}</button>
-                    <a href="/dashboard/" class="btn btn-secondary">Cancel</a>
-                </form>
-            </div>
+<div style="max-width: 720px; margin: 0 auto;">
+
+    <a href="{% url 'dashboard' %}" class="btn btn-text" style="padding-left:0; margin-bottom:8px;">
+        <span class="icon">arrow_back</span> Back to dashboard
+    </a>
+
+    <div class="card card-elevated">
+        <div class="page-head" style="margin-bottom:24px;">
+            <h1 class="headline-medium">{{ action }} link</h1>
+            <p>
+                {% if action == 'Create' %}Create a new short link. Only the destination URL is required.
+                {% else %}Update <code>{{ link.effective_code }}</code>.{% endif %}
+            </p>
         </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="field {% if form.original_url.errors %}has-error{% endif %}">
+                <input id="{{ form.original_url.id_for_label }}" name="{{ form.original_url.name }}"
+                       type="url" inputmode="url" autocomplete="url" required
+                       placeholder=" " value="{{ form.original_url.value|default:'' }}">
+                <label for="{{ form.original_url.id_for_label }}">Destination URL</label>
+            </div>
+            {% if form.original_url.errors %}<div class="field-support error">{{ form.original_url.errors|striptags }}</div>{% endif %}
+
+            <div class="field-row cols-2 mt-8">
+                <div>
+                    <div class="field {% if form.custom_alias.errors %}has-error{% endif %}">
+                        <input id="{{ form.custom_alias.id_for_label }}" name="{{ form.custom_alias.name }}"
+                               type="text" placeholder=" " value="{{ form.custom_alias.value|default:'' }}"
+                               pattern="[A-Za-z0-9_-]{3,50}" autocomplete="off" spellcheck="false">
+                        <label for="{{ form.custom_alias.id_for_label }}">Custom alias</label>
+                    </div>
+                    {% if form.custom_alias.errors %}
+                        <div class="field-support error">{{ form.custom_alias.errors|striptags }}</div>
+                    {% else %}
+                        <div class="field-support">3–50 chars · letters, digits, <code>-</code>, <code>_</code></div>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="field {% if form.expires_at.errors %}has-error{% endif %}">
+                        <input id="{{ form.expires_at.id_for_label }}" name="{{ form.expires_at.name }}"
+                               type="datetime-local" placeholder=" "
+                               value="{{ form.expires_at.value|default:''|date:'Y-m-d\TH:i' }}">
+                        <label for="{{ form.expires_at.id_for_label }}">Expires at</label>
+                    </div>
+                    {% if form.expires_at.errors %}
+                        <div class="field-support error">{{ form.expires_at.errors|striptags }}</div>
+                    {% else %}
+                        <div class="field-support">Auto-deactivates after this date</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="field {% if form.description.errors %}has-error{% endif %} mt-8">
+                <input id="{{ form.description.id_for_label }}" name="{{ form.description.name }}"
+                       type="text" placeholder=" " value="{{ form.description.value|default:'' }}" maxlength="200">
+                <label for="{{ form.description.id_for_label }}">Internal note</label>
+            </div>
+            <div class="field-support">Private label. Search uses this on the dashboard.</div>
+
+            <div class="field-row cols-2 mt-16">
+                <div>
+                    <div class="field {% if form.password.errors %}has-error{% endif %}">
+                        <input id="{{ form.password.id_for_label }}" name="{{ form.password.name }}"
+                               type="password" placeholder=" " autocomplete="new-password" maxlength="72">
+                        <label for="{{ form.password.id_for_label }}">Password gate</label>
+                    </div>
+                    {% if form.password.errors %}
+                        <div class="field-support error">{{ form.password.errors|striptags }}</div>
+                    {% else %}
+                        <div class="field-support">PBKDF2-hashed · leave blank to disable</div>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="field {% if form.max_clicks.errors %}has-error{% endif %}">
+                        <input id="{{ form.max_clicks.id_for_label }}" name="{{ form.max_clicks.name }}"
+                               type="number" placeholder=" " min="0" max="1000000"
+                               value="{{ form.max_clicks.value|default:'' }}">
+                        <label for="{{ form.max_clicks.id_for_label }}">Click cap</label>
+                    </div>
+                    {% if form.max_clicks.errors %}
+                        <div class="field-support error">{{ form.max_clicks.errors|striptags }}</div>
+                    {% else %}
+                        <div class="field-support"><code>0</code> = unlimited</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <hr class="divider mt-24">
+
+            <div class="row gap-8" style="justify-content:flex-end;">
+                <a href="{% url 'dashboard' %}" class="btn btn-text">Cancel</a>
+                <button type="submit" class="btn btn-filled with-leading">
+                    <span class="icon">{% if action == 'Create' %}check{% else %}save{% endif %}</span>
+                    {% if action == 'Create' %}Create link{% else %}Save changes{% endif %}
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

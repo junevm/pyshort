@@ -1,45 +1,221 @@
 {% extends "shortener/base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Your links{% endblock %}
+
+{% block extra_head %}
+<style>
+    .filters-bar {
+        display: grid; gap: 12px; grid-template-columns: 1fr;
+        background: var(--md-sys-color-surface-container);
+        border-radius: var(--md-sys-shape-corner-md);
+        padding: 12px;
+        margin-bottom: 24px;
+    }
+    @media (min-width: 905px) {
+        .filters-bar { grid-template-columns: 2fr 1fr 1fr auto; align-items: end; }
+    }
+
+    /* M3 search field — outlined variant, rounded "search" container. */
+    .search {
+        position: relative; height: 56px;
+        background: var(--md-sys-color-surface-container-highest);
+        border-radius: var(--md-sys-shape-corner-full);
+        display: flex; align-items: center; padding: 0 8px 0 16px;
+    }
+    .search > .icon { color: var(--md-sys-color-on-surface-variant); margin-right: 8px; }
+    .search > input {
+        flex: 1; min-width: 0; height: 100%; border: 0; outline: 0;
+        background: transparent; color: var(--md-sys-color-on-surface);
+        font: var(--md-sys-typescale-body-large);
+    }
+    .search > input::placeholder { color: var(--md-sys-color-on-surface-variant); }
+
+    .empty {
+        text-align: center; padding: 64px 24px;
+        background: var(--md-sys-color-surface-container-low);
+        border-radius: var(--md-sys-shape-corner-md);
+        color: var(--md-sys-color-on-surface-variant);
+    }
+    .empty-mark {
+        width: 64px; height: 64px; border-radius: var(--md-sys-shape-corner-lg);
+        background: var(--md-sys-color-primary-container);
+        color: var(--md-sys-color-on-primary-container);
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 16px;
+    }
+    .empty h3 { font: var(--md-sys-typescale-title-large); color: var(--md-sys-color-on-surface); }
+    .empty p  { font: var(--md-sys-typescale-body-medium); margin: 8px 0 20px; }
+
+    /* Pagination ------------------------------------------------------- */
+    .pager {
+        display: flex; align-items: center; justify-content: center;
+        gap: 8px; margin-top: 16px;
+        color: var(--md-sys-color-on-surface-variant);
+        font: var(--md-sys-typescale-label-large);
+    }
+    .pager .step { display: inline-flex; align-items: center; gap: 4px; }
+
+    /* Floating Action Button - extended (M3) ----------------------------- */
+    .fab-region {
+        position: fixed; right: 24px; bottom: 24px; z-index: 50;
+    }
+    @media (min-width: 905px) { .fab-region { display: none; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>My Links</h1>
-    <a href="/create/" class="btn btn-primary">Create New Link</a>
+
+<div class="row wrap gap-16 mb-24" style="justify-content:space-between;">
+    <div class="page-head" style="margin-bottom:0;">
+        <h1>Your links</h1>
+        <p>
+            {% if total %}{{ total }} link{{ total|pluralize }} · {{ user.username }}
+            {% else %}Nothing here yet. Create your first short link.{% endif %}
+        </p>
+    </div>
+    <a href="{% url 'create_link' %}" class="btn btn-filled with-leading hide-sm" style="height:48px;">
+        <span class="icon">add</span> New link
+    </a>
 </div>
+
+<!-- Filters bar (search, status, sort) ----------------------------------- -->
+<form method="get" class="filters-bar" role="search">
+    <label class="search">
+        <span class="icon" aria-hidden="true">search</span>
+        <input type="search" name="q" value="{{ q }}" placeholder="Search by URL, code, alias or note" aria-label="Search links">
+    </label>
+
+    <div class="field" style="margin-bottom:0;">
+        <select id="dash-status" name="status">
+            <option value="all"      {% if status == 'all' %}selected{% endif %}>All statuses</option>
+            <option value="active"   {% if status == 'active' %}selected{% endif %}>Active only</option>
+            <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive only</option>
+            <option value="expired"  {% if status == 'expired' %}selected{% endif %}>Expired</option>
+        </select>
+        <label for="dash-status">Status</label>
+    </div>
+
+    <div class="field" style="margin-bottom:0;">
+        <select id="dash-sort" name="sort">
+            <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Newest first</option>
+            <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+            <option value="clicks" {% if sort == 'clicks' %}selected{% endif %}>Most clicks</option>
+            <option value="code"   {% if sort == 'code'   %}selected{% endif %}>Code A–Z</option>
+        </select>
+        <label for="dash-sort">Sort</label>
+    </div>
+
+    <button type="submit" class="btn btn-outlined with-leading" style="height:56px;">
+        <span class="icon">filter_alt</span> Apply
+    </button>
+</form>
+
 {% if links %}
-<div class="table-responsive">
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Short Code</th>
-                <th>Original URL</th>
-                <th>Clicks</th>
-                <th>Created</th>
-                <th>Expires</th>
-                <th>Active</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for link in links %}
-            <tr>
-                <td><a href="/{{ link.effective_code }}/">{{ link.effective_code }}</a></td>
-                <td><a href="{{ link.original_url }}" target="_blank">{{ link.original_url|truncatechars:50 }}</a></td>
-                <td>{{ link.click_count }}</td>
-                <td>{{ link.created_at|date:"Y-m-d" }}</td>
-                <td>{{ link.expires_at|date:"Y-m-d"|default:"-" }}</td>
-                <td>{% if link.is_active %}<span class="badge bg-success">Active</span>{% else %}<span
-                        class="badge bg-secondary">Inactive</span>{% endif %}</td>
-                <td>
-                    <a href="/analytics/{{ link.pk }}/" class="btn btn-sm btn-info">Stats</a>
-                    <a href="/edit/{{ link.pk }}/" class="btn btn-sm btn-warning">Edit</a>
-                    <a href="/delete/{{ link.pk }}/" class="btn btn-sm btn-danger">Delete</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="card-outlined" style="padding:0; overflow:hidden; border-radius: var(--md-sys-shape-corner-md);">
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th scope="col">Code</th>
+                    <th scope="col">Destination</th>
+                    <th scope="col">Note</th>
+                    <th scope="col" style="text-align:right;">Clicks</th>
+                    <th scope="col">Expires</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" style="text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for link in links %}
+                <tr>
+                    <td class="code-cell">
+                        <a href="/{{ link.effective_code }}/">{{ link.effective_code }}</a>
+                    </td>
+                    <td>
+                        <a href="{{ link.original_url }}" target="_blank" rel="noopener"
+                           class="truncate" title="{{ link.original_url }}"
+                           style="display:inline-block;max-width:32ch;">
+                            {{ link.original_url|truncatechars:55 }}
+                        </a>
+                    </td>
+                    <td class="muted truncate" title="{{ link.description }}">
+                        {{ link.description|truncatechars:30|default:"—" }}
+                    </td>
+                    <td class="num" style="text-align:right;">
+                        <strong>{{ link.click_count }}</strong>{% if link.max_clicks %} <span class="muted">/ {{ link.max_clicks }}</span>{% endif %}
+                    </td>
+                    <td class="muted">{{ link.expires_at|date:"M j, Y"|default:"Never" }}</td>
+                    <td>
+                        <div class="row wrap gap-4">
+                            {% if link.is_active %}
+                                <span class="chip success"><span class="icon" aria-hidden="true">check_circle</span> Active</span>
+                            {% else %}
+                                <span class="chip"><span class="icon" aria-hidden="true">block</span> Inactive</span>
+                            {% endif %}
+                            {% if link.has_password %}<span class="chip tonal"><span class="icon" aria-hidden="true">lock</span> Password</span>{% endif %}
+                            {% if link.is_expired %}<span class="chip error"><span class="icon" aria-hidden="true">schedule</span> Expired</span>{% endif %}
+                        </div>
+                    </td>
+                    <td style="text-align:right; white-space:nowrap;">
+                        <button type="button" class="icon-btn" data-copy="{{ request.scheme }}://{{ request.get_host }}/{{ link.effective_code }}/" aria-label="Copy short URL" title="Copy">
+                            <span class="icon">content_copy</span>
+                        </button>
+                        <a href="{% url 'analytics' link.pk %}" class="icon-btn" aria-label="Analytics" title="Analytics">
+                            <span class="icon">analytics</span>
+                        </a>
+                        <a href="{% url 'qr_code' link.pk %}" target="_blank" class="icon-btn" aria-label="QR code" title="QR code">
+                            <span class="icon">qr_code_2</span>
+                        </a>
+                        <a href="{% url 'edit_link' link.pk %}" class="icon-btn" aria-label="Edit" title="Edit">
+                            <span class="icon">edit</span>
+                        </a>
+                        <a href="{% url 'delete_link' link.pk %}" class="icon-btn danger" aria-label="Delete" title="Delete">
+                            <span class="icon">delete</span>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
-{% else %}
-<p class="text-muted">No links yet. <a href="/create/">Create your first link!</a></p>
+
+{% if page.has_other_pages %}
+<nav class="pager" aria-label="Pagination">
+    {% if page.has_previous %}
+        <a class="btn btn-text" href="?q={{ q }}&status={{ status }}&sort={{ sort }}&page={{ page.previous_page_number }}">
+            <span class="icon">chevron_left</span> Previous
+        </a>
+    {% endif %}
+    <span class="step">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+        <a class="btn btn-text" href="?q={{ q }}&status={{ status }}&sort={{ sort }}&page={{ page.next_page_number }}">
+            Next <span class="icon">chevron_right</span>
+        </a>
+    {% endif %}
+</nav>
 {% endif %}
+
+{% else %}
+<div class="empty">
+    <span class="empty-mark"><span class="icon" style="font-size:32px;">link</span></span>
+    {% if q or status != 'all' %}
+        <h3>No links match those filters</h3>
+        <p>Try clearing the search or switching status to <strong>All statuses</strong>.</p>
+        <a href="{% url 'dashboard' %}" class="btn btn-outlined">Clear filters</a>
+    {% else %}
+        <h3>You haven't created any links yet</h3>
+        <p>Short links you create will show up here with click counts, expiry, and QR codes.</p>
+        <a href="{% url 'create_link' %}" class="btn btn-filled with-leading">
+            <span class="icon">add</span> Create your first link
+        </a>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Extended FAB on mobile (M3 pattern for primary screen action) ------ -->
+<div class="fab-region">
+    <a href="{% url 'create_link' %}" class="fab" aria-label="New link">
+        <span class="icon">add</span> New link
+    </a>
+</div>
 {% endblock %}
